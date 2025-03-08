@@ -6,7 +6,7 @@ import * as schema from "./schema";
 const client = postgres(process.env.POSTGRES_URL!);
 
 // Create the Drizzle client
-export const db = drizzle(client, { schema });
+export const db = drizzle(client, { schema, casing: "snake_case" });
 
 // Export the schema
 export * from "./schema";
