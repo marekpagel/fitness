@@ -1,4 +1,4 @@
-import FitnessTracker from "./components/FitnessTracker";
+import FitnessTracker from './components/FitnessTracker';
 
 export default function Home() {
   return (
@@ -6,10 +6,8 @@ export default function Home() {
       <div className="text-center max-w-3xl">
         <h1 className="text-4xl font-bold mb-4">Bolt Fitness Challenge</h1>
         <p className="text-lg text-gray-600 mb-8">
-          Track your group&apos;s fitness progress with push-up and pull-up
-          challenges. Add participants, record daily scores, and visualize
-          performance. Perfect for trainers, fitness classes, and fitness
-          challenges.
+          Track your group&apos;s fitness progress with push-up and pull-up challenges. Add participants, record daily
+          scores, and visualize performance. Perfect for trainers, fitness classes, and fitness challenges.
         </p>
       </div>
       <FitnessTracker />
