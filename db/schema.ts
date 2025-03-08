@@ -18,7 +18,7 @@ const timeStamps = {
 };
 
 export const participant = pgTable(
-  "participants",
+  "participant",
   {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),

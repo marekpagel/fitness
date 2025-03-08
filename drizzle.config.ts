@@ -12,4 +12,5 @@ export default {
     },
   },
   dialect: "postgresql",
+  casing: "snake_case",
 } satisfies Config;
