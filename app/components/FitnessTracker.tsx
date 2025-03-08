@@ -13,21 +13,29 @@ import {
 type Participant = {
   id: number;
   name: string;
+  email: string;
   createdAt?: Date | null;
+  updatedAt?: Date | null;
 };
 
 type Score = {
   id: number;
   participantId: number;
+  event: "pushup_60s" | "pullup_max";
   score: number;
   date: string;
   createdAt?: Date | null;
+  updatedAt?: Date | null;
 };
 
 export default function FitnessTracker() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState<
+    "pushup_60s" | "pullup_max"
+  >("pushup_60s");
   const [newDate, setNewDate] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -53,28 +61,35 @@ export default function FitnessTracker() {
   // Get all unique dates from scores
   const dates = Array.from(new Set(scores.map((s) => s.date))).sort();
 
-  // Get scores for a participant on a specific date
+  // Get scores for a participant on a specific date and event
   const getScoreForParticipant = (participantId: number, date: string) => {
     return (
-      scores.find((s) => s.participantId === participantId && s.date === date)
-        ?.score || 0
+      scores.find(
+        (s) =>
+          s.participantId === participantId &&
+          s.date === date &&
+          s.event === selectedEvent
+      )?.score || 0
     );
   };
 
-  // Calculate total score for a participant
+  // Calculate total score for a participant for current event
   const getTotalScore = (participantId: number) => {
     return scores
-      .filter((s) => s.participantId === participantId)
+      .filter(
+        (s) => s.participantId === participantId && s.event === selectedEvent
+      )
       .reduce((sum, s) => sum + s.score, 0);
   };
 
   // Add new participant
   const handleAddParticipant = async () => {
-    if (!newName.trim()) return;
+    if (!newName.trim() || !newEmail.trim()) return;
     try {
-      const [newParticipant] = await addParticipant(newName);
+      const [newParticipant] = await addParticipant(newName, newEmail);
       setParticipants([...participants, newParticipant]);
       setNewName("");
+      setNewEmail("");
     } catch (error) {
       console.error("Error adding participant:", error);
     }
@@ -98,10 +113,20 @@ export default function FitnessTracker() {
     newScore: number
   ) => {
     try {
-      const [updatedScore] = await addScore(participantId, newScore, date);
+      const [updatedScore] = await addScore(
+        participantId,
+        selectedEvent,
+        newScore,
+        date
+      );
       setScores((prev) => {
         const filtered = prev.filter(
-          (s) => !(s.participantId === participantId && s.date === date)
+          (s) =>
+            !(
+              s.participantId === participantId &&
+              s.date === date &&
+              s.event === selectedEvent
+            )
         );
         return [...filtered, updatedScore];
       });
@@ -128,12 +153,33 @@ export default function FitnessTracker() {
             placeholder="Participant name"
             className="p-2 border rounded"
           />
+          <input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="Email"
+            className="p-2 border rounded"
+          />
           <button
             onClick={handleAddParticipant}
             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
           >
             Add Participant
           </button>
+        </div>
+
+        {/* Event selector */}
+        <div className="flex gap-2">
+          <select
+            value={selectedEvent}
+            onChange={(e) =>
+              setSelectedEvent(e.target.value as "pushup_60s" | "pullup_max")
+            }
+            className="p-2 border rounded"
+          >
+            <option value="pushup_60s">Push-ups (60s)</option>
+            <option value="pullup_max">Pull-ups (Max)</option>
+          </select>
         </div>
 
         {/* Add new date */}
@@ -159,6 +205,7 @@ export default function FitnessTracker() {
           <thead>
             <tr className="bg-gray-100">
               <th className="py-3 px-4 border-b text-left">Name</th>
+              <th className="py-3 px-4 border-b text-left">Email</th>
               {dates.map((date) => (
                 <th key={date} className="py-3 px-4 border-b text-center">
                   {new Date(date).toLocaleDateString()}
@@ -172,6 +219,7 @@ export default function FitnessTracker() {
             {participants.map((participant) => (
               <tr key={participant.id}>
                 <td className="py-3 px-4 border-b">{participant.name}</td>
+                <td className="py-3 px-4 border-b">{participant.email}</td>
                 {dates.map((date) => (
                   <td
                     key={`${participant.id}-${date}`}
