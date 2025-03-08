@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useState} from 'react';
-import {addParticipant, getParticipants, addScore, getScores} from '../actions/fitness';
+import {getParticipants, addScore, getScores} from '../actions/fitness';
 import {
   startOfMonth,
   endOfMonth,
@@ -83,8 +83,6 @@ function generateWeekdayDates(targetDate: Date = new Date()): {
 export default function FitnessTracker() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<'pushup_60s' | 'pullup_max'>('pushup_60s');
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(true);
@@ -111,7 +109,7 @@ export default function FitnessTracker() {
   // Get scores for a participant on a specific date and event
   const getScoreForParticipant = (participantId: number, date: string) => {
     return (
-      scores.find((s) => s.participantId === participantId && s.date === date && s.event === selectedEvent)?.score || 0
+      scores.find((s) => s.participantId === participantId && s.date === date && s.event === selectedEvent)?.score ?? ''
     );
   };
 
@@ -122,17 +120,14 @@ export default function FitnessTracker() {
       .reduce((sum, s) => sum + s.score, 0);
   };
 
-  // Add new participant
-  const handleAddParticipant = async () => {
-    if (!newName.trim() || !newEmail.trim()) return;
-    try {
-      const [newParticipant] = await addParticipant(newName, newEmail);
-      setParticipants([...participants, newParticipant]);
-      setNewName('');
-      setNewEmail('');
-    } catch (error) {
-      console.error('Error adding participant:', error);
-    }
+  // Calculate average score for a participant for current event
+  const getAverageScore = (participantId: number) => {
+    const participantScores = scores.filter(
+      (s) => s.participantId === participantId && s.event === selectedEvent && s.score > 0
+    );
+    if (participantScores.length === 0) return '-';
+    const average = participantScores.reduce((sum, s) => sum + s.score, 0) / participantScores.length;
+    return average.toFixed(1);
   };
 
   // Update score
@@ -176,7 +171,11 @@ export default function FitnessTracker() {
     <div className="w-full max-w-6xl mx-auto p-4 fitness-tracker">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Group Fitness Tracker</h2>
+      </div>
+
+      <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-4">
+          {/* Month selector */}
           <div className="flex items-center gap-2">
             <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-gray-100">
               ←
@@ -191,50 +190,8 @@ export default function FitnessTracker() {
               →
             </button>
           </div>
-          <button
-            onClick={() => setIsEditMode(!isEditMode)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              isEditMode
-                ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-            }`}
-          >
-            {isEditMode ? '✏️ Edit Mode' : '👀 View Mode'}
-          </button>
-        </div>
-      </div>
 
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-        {/* Add new participant */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Participant name"
-            className={`p-2 border rounded transition-opacity ${!isEditMode && 'opacity-50'}`}
-            disabled={!isEditMode}
-          />
-          <input
-            type="email"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            placeholder="Email"
-            className="p-2 border rounded hidden"
-          />
-          <button
-            onClick={handleAddParticipant}
-            className={`bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-opacity ${
-              !isEditMode && 'opacity-50 cursor-not-allowed'
-            }`}
-            disabled={!isEditMode}
-          >
-            Add Participant
-          </button>
-        </div>
-
-        {/* Event selector */}
-        <div className="flex gap-2">
+          {/* Event selector */}
           <select
             value={selectedEvent}
             onChange={(e) => setSelectedEvent(e.target.value as 'pushup_60s' | 'pullup_max')}
@@ -244,6 +201,18 @@ export default function FitnessTracker() {
             <option value="pullup_max">Pull-ups (Max)</option>
           </select>
         </div>
+
+        {/* Edit mode toggle */}
+        <button
+          onClick={() => setIsEditMode(!isEditMode)}
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            isEditMode
+              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+          }`}
+        >
+          {isEditMode ? '✏️ Edit Mode' : '👀 View Mode'}
+        </button>
       </div>
 
       {/* Participants table */}
@@ -263,14 +232,22 @@ export default function FitnessTracker() {
                   <div className="text-sm text-gray-600">{weekRanges[weekName]}</div>
                 </th>
               ))}
-              <th rowSpan={2} className="py-2 px-3 border-b text-center font-medium text-sm">
+              <th rowSpan={2} className="py-2 px-3 border-b text-center font-medium text-sm min-w-[4ch]">
                 Total
+              </th>
+              <th rowSpan={2} className="py-2 px-3 border-b text-center font-medium text-sm min-w-[4ch]">
+                Avg
               </th>
             </tr>
             <tr className="bg-gray-50">
               {Object.values(weeks).map((weekDates) =>
                 weekDates.map((_, index) => (
-                  <th key={`day-${index}`} className="py-1 px-1 border-b text-center text-xs font-medium text-gray-600">
+                  <th
+                    key={`day-${index}`}
+                    className={`py-1 px-1 border-b text-center text-xs font-medium text-gray-600 ${
+                      index === weekDates.length - 1 ? 'border-r' : ''
+                    }`}
+                  >
                     {weekdays[index]}
                   </th>
                 ))
@@ -283,25 +260,42 @@ export default function FitnessTracker() {
                 <td className="py-2 px-3 border-b border-r text-sm">{participant.name}</td>
                 {allDates.map((date) => {
                   const score = getScoreForParticipant(participant.id, date);
+                  // Find which week this date belongs to
+                  const isLastInWeek = Object.values(weeks).some(
+                    (weekDates) => weekDates[weekDates.length - 1] === date
+                  );
+
                   return (
-                    <td key={`${participant.id}-${date}`} className="py-1 px-1 border-b text-center">
+                    <td
+                      key={`${participant.id}-${date}`}
+                      className={`py-1 px-1 border-b text-center min-w-[2rem] w-8 ${isLastInWeek ? 'border-r' : ''}`}
+                    >
                       {isEditMode ? (
                         <input
                           type="number"
                           min="0"
                           max="99"
-                          value={score}
-                          onChange={(e) => handleUpdateScore(participant.id, date, parseInt(e.target.value) || 0)}
-                          className="w-8 py-0.5 px-0 text-center border rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          value={score === '' ? '' : score}
+                          onChange={(e) =>
+                            handleUpdateScore(
+                              participant.id,
+                              date,
+                              e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                            )
+                          }
+                          className="w-full py-0.5 px-0 text-center border rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       ) : (
-                        <span className="text-sm">{score || '-'}</span>
+                        <span className="text-sm inline-block w-full">{score || '-'}</span>
                       )}
                     </td>
                   );
                 })}
-                <td className="py-2 px-3 border-b text-center font-semibold text-sm">
+                <td className="py-2 px-3 border-b text-center font-semibold text-sm min-w-[6ch]">
                   {getTotalScore(participant.id)}
+                </td>
+                <td className="py-2 px-3 border-b text-center font-semibold text-sm min-w-[6ch]">
+                  {getAverageScore(participant.id)}
                 </td>
               </tr>
             ))}
