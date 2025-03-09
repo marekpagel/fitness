@@ -18,6 +18,7 @@ import {
   isFriday,
   endOfWeek,
 } from 'date-fns';
+import ScoresChart from './ScoresChart';
 
 // Define types for our data
 type Participant = {
@@ -378,6 +379,15 @@ export default function FitnessTracker() {
       </div>
 
       {participants.length === 0 && <p className="text-center py-4">No participants yet. Add some to get started!</p>}
+
+      {participants.length > 0 && (
+        <ScoresChart
+          scores={scores}
+          participants={participants}
+          selectedEvent={selectedEvent}
+          currentMonth={currentMonth}
+        />
+      )}
     </div>
   );
 }
