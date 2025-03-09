@@ -1,4 +1,5 @@
 import {pgTable, serial, text, integer, timestamp, date, pgEnum, uniqueIndex, index} from 'drizzle-orm/pg-core';
+import {EVENTS} from '../app/types/events';
 
 const timeStamps = {
   createdAt: timestamp('created_at').defaultNow(),
@@ -18,7 +19,7 @@ export const participant = pgTable(
   (table) => ({emailUidx: uniqueIndex('email_uidx').on(table.email)})
 );
 
-export const eventEnum = pgEnum('event', ['pushup_60s', 'pullup_max']);
+export const eventEnum = pgEnum('event', EVENTS);
 
 export const score = pgTable(
   'score',

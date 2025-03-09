@@ -1,7 +1,9 @@
 'use client';
 
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useCallback} from 'react';
+import {debounce} from 'lodash-es';
 import {getParticipants, addScore, getScores} from '../actions/fitness';
+import {EVENTS, Event, EVENT_LABELS} from '../types/events';
 import {
   startOfMonth,
   endOfMonth,
@@ -29,7 +31,7 @@ type Participant = {
 type Score = {
   id: number;
   participantId: number;
-  event: 'pushup_60s' | 'pullup_max';
+  event: Event;
   score: number;
   date: string;
   createdAt?: Date | null;
@@ -83,12 +85,69 @@ function generateWeekdayDates(targetDate: Date = new Date()): {
 export default function FitnessTracker() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<'pushup_60s' | 'pullup_max'>('pushup_60s');
+  const [selectedEvent, setSelectedEvent] = useState<Event>(EVENTS[0]);
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const {weeks, allDates, weekRanges} = generateWeekdayDates(currentMonth);
+
+  // Create a single persistent debounced function
+  const debouncedUpdate = useCallback(
+    debounce(async (participantId: number, date: string, newScore: number, event: Event) => {
+      try {
+        const [updatedScore] = await addScore(participantId, event, newScore, date);
+        setScores((prev) => {
+          const filtered = prev.filter(
+            (s) => !(s.participantId === participantId && s.date === date && s.event === event)
+          );
+          return [...filtered, updatedScore];
+        });
+      } catch (error) {
+        console.error('Error updating score:', error);
+      }
+    }, 1000),
+    []
+  );
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => debouncedUpdate.cancel();
+  }, [debouncedUpdate]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle keyboard shortcuts if not typing in an input
+      if (e.target instanceof HTMLInputElement) return;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          handlePrevMonth();
+          break;
+        case 'ArrowRight':
+          handleNextMonth();
+          break;
+        case 'ArrowUp':
+          setSelectedEvent((current) => {
+            const currentIndex = EVENTS.indexOf(current);
+            const nextIndex = currentIndex - 1;
+            return EVENTS[nextIndex < 0 ? EVENTS.length - 1 : nextIndex];
+          });
+          break;
+        case 'ArrowDown':
+          setSelectedEvent((current) => {
+            const currentIndex = EVENTS.indexOf(current);
+            const nextIndex = currentIndex + 1;
+            return EVENTS[nextIndex >= EVENTS.length ? 0 : nextIndex];
+          });
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Load initial data
   useEffect(() => {
@@ -116,33 +175,45 @@ export default function FitnessTracker() {
   // Calculate total score for a participant for current event
   const getTotalScore = (participantId: number) => {
     return scores
-      .filter((s) => s.participantId === participantId && s.event === selectedEvent)
+      .filter(
+        (s) => s.participantId === participantId && s.event === selectedEvent && allDates.includes(s.date) // Only include scores from current month's dates
+      )
       .reduce((sum, s) => sum + s.score, 0);
   };
 
   // Calculate average score for a participant for current event
   const getAverageScore = (participantId: number) => {
     const participantScores = scores.filter(
-      (s) => s.participantId === participantId && s.event === selectedEvent && s.score > 0
+      (s) => s.participantId === participantId && s.event === selectedEvent && s.score > 0 && allDates.includes(s.date) // Only include scores from current month's dates
     );
     if (participantScores.length === 0) return '-';
     const average = participantScores.reduce((sum, s) => sum + s.score, 0) / participantScores.length;
     return average.toFixed(1);
   };
 
-  // Update score
-  const handleUpdateScore = async (participantId: number, date: string, newScore: number) => {
-    try {
-      const [updatedScore] = await addScore(participantId, selectedEvent, newScore, date);
-      setScores((prev) => {
-        const filtered = prev.filter(
-          (s) => !(s.participantId === participantId && s.date === date && s.event === selectedEvent)
-        );
-        return [...filtered, updatedScore];
-      });
-    } catch (error) {
-      console.error('Error updating score:', error);
-    }
+  // Update score handler
+  const handleUpdateScore = (participantId: number, date: string, newScore: number) => {
+    // Optimistically update the UI
+    setScores((prev) => {
+      const filtered = prev.filter(
+        (s) => !(s.participantId === participantId && s.date === date && s.event === selectedEvent)
+      );
+      return [
+        ...filtered,
+        {
+          id: 0, // Temporary ID for optimistic update
+          participantId,
+          date,
+          event: selectedEvent,
+          score: newScore,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+    });
+
+    // Queue the actual update
+    debouncedUpdate(participantId, date, newScore, selectedEvent);
   };
 
   const handlePrevMonth = () => {
@@ -194,11 +265,14 @@ export default function FitnessTracker() {
           {/* Event selector */}
           <select
             value={selectedEvent}
-            onChange={(e) => setSelectedEvent(e.target.value as 'pushup_60s' | 'pullup_max')}
+            onChange={(e) => setSelectedEvent(e.target.value as Event)}
             className="p-2 border rounded"
           >
-            <option value="pushup_60s">Push-ups (60s)</option>
-            <option value="pullup_max">Pull-ups (Max)</option>
+            {EVENTS.map((event) => (
+              <option key={event} value={event}>
+                {EVENT_LABELS[event]}
+              </option>
+            ))}
           </select>
         </div>
 

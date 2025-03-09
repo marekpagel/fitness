@@ -15,9 +15,11 @@
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/supabase-js": "latest",
+    "@types/lodash-es": "^4.17.12",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "drizzle-orm": "latest",
+    "lodash-es": "^4.17.21",
     "next": "15.2.0",
     "pg": "latest",
     "postgres": "latest",
