@@ -87,7 +87,7 @@ export default function FitnessTracker() {
   const [scores, setScores] = useState<Score[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event>(EVENTS[0]);
   const [loading, setLoading] = useState(true);
-  const [isEditMode, setIsEditMode] = useState(true);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const {weeks, allDates, weekRanges} = generateWeekdayDates(currentMonth);
